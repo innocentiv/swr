@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { cacheGet, cacheSet } from './config'
+
+import { cache } from './config'
 import {
   pageComponentType,
   pageOffsetMapperType,
@@ -94,15 +95,15 @@ export function useSWRPages<OffsetType = any, Data = any, Error = any>(
   pageFn: pageComponentType<OffsetType, Data, Error>,
   SWRToOffset: pageOffsetMapperType<OffsetType, Data, Error>,
   deps: any[] = []
-): pagesResponseInterface {
-  const pageCountKey = '_swr_page_count_' + pageKey
-  const pageOffsetKey = '_swr_page_offset_' + pageKey
+): pagesResponseInterface<Data, Error> {
+  const pageCountKey = `_swr_page_count_` + pageKey
+  const pageOffsetKey = `_swr_page_offset_` + pageKey
 
   const [pageCount, setPageCount] = useState<number>(
-    cacheGet(pageCountKey) || 1
+    cache.get(pageCountKey) || 1
   )
   const [pageOffsets, setPageOffsets] = useState<OffsetType[]>(
-    cacheGet(pageOffsetKey) || [null]
+    cache.get(pageOffsetKey) || [null]
   )
   const [pageSWRs, setPageSWRs] = useState<responseInterface<Data, Error>[]>([])
 
@@ -124,11 +125,11 @@ export function useSWRPages<OffsetType = any, Data = any, Error = any>(
   const resetPages = useCallback(() => {
     setPageSWRs([])
     setPageCount(() => {
-      cacheSet(pageCountKey, 1)
+      cache.set(pageCountKey, 1)
       return 1
     })
     setPageOffsets(() => {
-      cacheSet(pageOffsetKey, [null])
+      cache.set(pageOffsetKey, [null])
       return [null]
     })
     pageCacheMap.set(pageKey, [])
@@ -145,7 +146,7 @@ export function useSWRPages<OffsetType = any, Data = any, Error = any>(
   const loadMore = useCallback(() => {
     if (isLoadingMore || isReachingEnd) return
     setPageCount(c => {
-      cacheSet(pageCountKey, c + 1)
+      cache.set(pageCountKey, c + 1)
       return c + 1
     })
   }, [isLoadingMore, isReachingEnd, pageCountKey])
@@ -161,28 +162,32 @@ export function useSWRPages<OffsetType = any, Data = any, Error = any>(
         pageSWRs[id].error !== swr.error ||
         pageSWRs[id].revalidate !== swr.revalidate
       ) {
-        setPageSWRs(swrs => {
-          const _swrs = [...swrs]
-          _swrs[id] = {
-            data: swr.data,
-            error: swr.error,
-            revalidate: swr.revalidate,
-            isValidating: swr.isValidating
+        // hoist side effects: setPageSWRs and setPageOffsets -- https://reactjs.org/blog/2020/02/26/react-v16.13.0.html#warnings-for-some-updates-during-render
+        setTimeout(() => {
+          setPageSWRs(swrs => {
+            const _swrs = [...swrs]
+            _swrs[id] = {
+              data: swr.data,
+              error: swr.error,
+              revalidate: swr.revalidate,
+              isValidating: swr.isValidating,
+              mutate: swr.mutate
+            }
+            return _swrs
+          })
+          if (typeof swr.data !== 'undefined') {
+            // set next page's offset
+            const newPageOffset = SWRToOffset(swr, id)
+            if (pageOffsets[id + 1] !== newPageOffset) {
+              setPageOffsets(arr => {
+                const _arr = [...arr]
+                _arr[id + 1] = newPageOffset
+                cache.set(pageOffsetKey, _arr)
+                return _arr
+              })
+            }
           }
-          return _swrs
         })
-        if (typeof swr.data !== 'undefined') {
-          // set next page's offset
-          const newPageOffset = SWRToOffset(swr, id)
-          if (pageOffsets[id + 1] !== newPageOffset) {
-            setPageOffsets(arr => {
-              const _arr = [...arr]
-              _arr[id + 1] = newPageOffset
-              cacheSet(pageOffsetKey, _arr)
-              return _arr
-            })
-          }
-        }
       }
       return swr
     }
