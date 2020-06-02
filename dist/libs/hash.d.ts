@@ -1,1 +1,1 @@
-export default function hash(args: any[]): string
+export default function hash(args: any[]): string;

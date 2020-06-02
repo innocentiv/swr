@@ -1,1 +1,1 @@
-export default function isDocumentVisible(): boolean
+export default function isDocumentVisible(): boolean;

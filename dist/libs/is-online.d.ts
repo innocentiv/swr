@@ -1,1 +1,1 @@
-export default function isOnline(): boolean
+export default function isOnline(): boolean;

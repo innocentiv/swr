@@ -1,1 +1,1 @@
-export default function useHydration(): boolean
+export default function useHydration(): boolean;
