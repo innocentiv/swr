@@ -685,7 +685,7 @@ function useSWR<Data = any, Error = any>(
     })
 
     return state
-  }, [revalidate])
+  }, [revalidate, boundMutate, initialData, initialError, key])
 
   // suspense
   if (config.suspense) {
